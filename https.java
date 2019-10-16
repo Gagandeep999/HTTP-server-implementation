@@ -5,7 +5,9 @@ public class https{
     private static boolean isPostRequest = false;
     private static boolean needHelp = false;
     private static String portNumber = "8080";
-    private static String pathToDir = "";
+    private static String pathToDir = ".";
+    // private static String url = "";
+
 
 
     public static void main(String args[]) {
@@ -49,8 +51,8 @@ public class https{
                 isPostRequest = true;
             }else if (args[i].equalsIgnoreCase("help")){
                 needHelp = true;
-            }else{
-                url = (args[i]);
+            // }else{
+            //     pathToDir = (args[i]);
             }
        }
     }
@@ -93,4 +95,88 @@ public class https{
             System.exit(0);
         }
     }
+
+    /**
+     * get method that returns the content of the file
+     */
+    public static void get(String pathToDir){
+
+        //call secureAccess() 
+        //if no parameter 
+            //return content of the current directory
+        //else:
+            //call checkIfFileExist()
+                //return appropriate error message
+            //else:
+                //check for multiple reader / synchronization shit
+                //otherwise openFile()
+        //terminate thread
+        //keep waiting for another request
+    }
+
+    /**
+     * post method that writes to the specified file
+     */
+    public static void post(String pathToDir){
+
+        //call secureAccess() 
+        //go to the directory
+        //check if file exists, 
+                //if file doesn't... create it, 
+                //otherwise overwrite=true|false(need more discussion)
+        //call openFileAndPerformOperation()
+        //check for the multiple writers / synchronization shit
+        //terminate thread
+        //keep waiting for another request
+    }
+
+    /**
+     * this method is to check if the pathToDir is not outside the file server
+     * @param pathToDir
+     */
+    public static void secureAccess(String pathToDir){
+
+        //check if pathToDir is outside of current directory scope
+        //if yes
+            //send error message and terminate thread in this method
+        //else
+            // continue in normal order of execution
+
+    }
+
+    /**
+     * can be called by get() and post().Check if the file exisit and return true
+     * @param pathToDir
+     * @return
+     */
+    public static boolean checkIfFileExist(String pathToDir){
+        //this is called after the secureAccess() method
+        //we already know if it is a get/post request
+        //if the request if post :
+            // either create the file or override and return true
+        //else:
+            //just check (Find out what happens if file exist but there is nothing maybe!!!)
+        //return true/false
+
+        return true;
+
+    }
+
+    /**
+     * this can be called by get() and post()
+     * @param pathToDir
+     */
+    public void openFileAndPerformOperation(String pathToDir){
+        //buffered reader/writer can be defined here only, need not be static variables
+
+        //this is called after the checkIfFileExist()
+        //we already know if it is a get/post request
+        //based on the type of request open Buffered Reader/Writer and perform realted operations.
+        //if post:
+            // open file and write to it
+        //else:
+            //open file and read contents
+        //close the Buffered Reader/Writer.
+    }
+
 }
