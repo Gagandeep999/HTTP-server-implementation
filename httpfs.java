@@ -30,6 +30,7 @@ public class httpfs {
         //and this would throw an exception
         int portNum = Integer.parseInt(portNumber);
         try (ServerSocket serverSocket = new ServerSocket(portNum)){ 
+            System.out.println("Server has been instantiated at port " + portNum);
             while (true) {
                 new httpfsThread(serverSocket.accept());
 	        }
@@ -94,15 +95,15 @@ public class httpfs {
         run function is called when hhtpfsThreads are created and start() is used on them.
         */
         public void run() {
-            try( PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-                BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));) 
-            {
+            try{
+                PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+                BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                System.out.println("Thread created!!!");
+                out.print("hello");
                 //read the message
                 //call messageParser() which calls the appropriate get() or post()
-
                 socket.close();
-            } 
-            catch (IOException e) {
+            }catch (IOException e) {
                 e.printStackTrace();
             }
         }
