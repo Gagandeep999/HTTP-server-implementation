@@ -1,6 +1,8 @@
 import java.net.*;
 import java.io.*;
 import java.lang.Integer;
+import java.util.ArrayList;
+import java.util.List;
 
 /*
 httpfs acts as the continously listening serverSocket which accepts any connection and then creates a seperate thread
@@ -10,8 +12,8 @@ to take care of that request. (thus we enable the feature of simultaniously mana
 public class httpfs {
 
     private static boolean isVerbose = false;
-    private static boolean isGetRequest = false;
-    private static boolean isPostRequest = false;
+    // private static boolean isGetRequest = false;
+    // private static boolean isPostRequest = false;
     private static boolean needHelp = false;
     private static String portNumber = "8080";
     private static String pathToDir = ".";
@@ -53,85 +55,119 @@ public class httpfs {
                 +"Default is 8080.\n"
                 +"\t-d Specifies the directory that the server will use to read/write"
                 +"requested files. Default is the current directory when launching the application.";
-
-        String help_get = "\nhttpfs help get\n";
-                // +"\nusage: httpc get [-v] [-h key:value] URL\n"
-                // +"\nGet executes a HTTP GET request for a given URL.\n"
-                // +"\n-v Prints the detail of the response such as protocol, status, and headers.\n"
-                // +"-h key:value Associates headers to HTTP Request with the format 'key:value'.\n";
-
-        String help_post = "\nhttfs help post\n";
-                // +"\nusage: httpc post [-v] [-h key:value] [-d inline-data] [-f file] URL\n"
-                // +"\nPost executes a HTTP POST request for a given URL with inline data or from file.\n"
-                // +"\n-v Prints the detail of the response such as protocol, status, and headers.\n"
-                // +"-h key:value Associates headers to HTTP Request with the format 'key:value'.\n"
-                // +"-d string Associates an inline data to the body HTTP POST request.\n"
-                // +"-f file Associates the content of a file to the body HTTP POST request.\n"
-                // +"\nEither [-d] or [-f] can be used but not both.\n";
-
-        if(isPostRequest){
-            System.out.println(help_post);
-            System.exit(0);
-        }else if(isGetRequest){
-            System.out.println(help_get);
-            System.exit(0);
-        }else{
             System.out.println(help);
             System.exit(0);
-        }
+        
         }
     /*
     httpfsThread is a thread created by httpfs when a connection is accepted. In the thread we will 
     */
-    private static class httpfsThread extends Thread {
+    private static class httpfsThread extends Thread{
 
         private Socket socket = null;
+        static List<String> fileData = new ArrayList<>();
+        //if size is 1 then we know its just a file
+        //if size is greater then we know we dive further into folders (to be created if dotn exist)
+        static List<String> filePath = new ArrayList<>();
+        static PrintWriter out=null;
+        static BufferedReader in=null;
 
         /* 
         Calls the super() to allocate a new thread and direct its private socket.
         */
         public httpfsThread(Socket socket) {
             super("httpfsThread");
-            this.socket = socket;
+            this.socket = socket; 
+            try{
+                out = new PrintWriter(this.socket.getOutputStream(), true);
+                in = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
+            }
+            catch( Exception e){
+                System.out.println("error creating the thread");
+            }
         }
         /*
         run function is called when hhtpfsThreads are created and start() is used on them.
         */
         public void run() {
             try{
-                PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-                BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                System.out.println("inside the new thread...wohoooo");
-                //String message= in.readLine();
-                out.write("suck it");
-                //call messageParser() which calls the appropriate get() or post()
-
+                System.out.println("inside a new thread");
+                messageParser();
                 socket.close();
+                System.out.println("    thread completed\n");
             } 
-            catch (IOException e) {
+            catch (Exception e) {
                 e.printStackTrace();
             }
         }
 
-
         //this needs to be modified to parse the message received from the client
-        public void messageParser(String message){
-        
+        public void messageParser() throws Exception{
+
+            //gives us what the first lign of the message is
+            //determines if its a get or post
+            try{
+                String line = in.readLine();
+                String temp ="";
+                //System.out.println(line);
+                if(line.contains("GET ")){
+                    String[] tokens=line.split(" ");
+                    String path=tokens[1];
+                    //System.out.println(path);
+                    String[] tokens_2=path.split("/");
+                    for(int i = 0; i<tokens_2.length;i++){
+                        filePath.add(tokens_2[i]);
+                    }
+                    get();
+                  //System.out.println("get done");
+                }
+                else if(line.contains("POST ")){
+                    
+                }
+                else{
+                    System.out.println("wrong format .... request dropped");
+                }
+                socket .close();
+            } 
+            catch(Exception e){
+                System.out.println("error in the message parser");
+            }
+            
         }
         /**
          * get method that returns the content of the file
          */
-        public void get(String pathToDir){
-
+        public void get(){
+    
             //call secureAccess() 
+
             //if no parameter 
+            if(filePath.size()==0){
                 //return content of the current directory
-            //else:
+                File directory = new File("./");
+                File[] contentOfDirectory = directory.listFiles();
+                int size=contentOfDirectory.length;
+                out.write("HTTP/1.0 200 OK\r\n");
+                out.write("Content-Length: "+size+"\r\n");
+                out.write("\r\n");
+                for (File object : contentOfDirectory) {
+                    if(object.isFile()){
+                        out.write("File name : "+object.getName()+"\n");
+                    }
+                    else if(object.isDirectory()){
+                        out.write("Directory name : "+object.getName()+"\n");
+                    }
+                }
+                out.flush();
+            }
+            else{
                 //call checkIfFileExist()
                     //return appropriate error message
                 //else:
                     //check for multiple reader / synchronization shit
                     //otherwise openFile()
+            }
+                
             //terminate thread
             //keep waiting for another request
         }
@@ -171,6 +207,9 @@ public class httpfs {
          * @param pathToDir
          * @return
          */
+        //
+        //create also the folders
+        //
         public boolean checkIfFileExist(String pathToDir){
             //this is called after the secureAccess() method
             //we already know if it is a get/post request
