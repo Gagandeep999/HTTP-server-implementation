@@ -2,6 +2,8 @@ import java.net.*;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.nio.file.Path;
 import java.io.*;
 import java.lang.Integer;
@@ -87,6 +89,10 @@ public class httpfs {
     private static class httpfsThread extends Thread {
 
         private Socket socket = null;
+        static List<String> fileData = new ArrayList<>();
+        static List<String> filePath = new ArrayList<>();
+        static PrintWriter out=null;
+        static BufferedReader in=null;
 
         /* 
         Calls the super() to allocate a new thread and direct its private socket.
@@ -94,44 +100,96 @@ public class httpfs {
         public httpfsThread(Socket socket) {
             super();
             this.socket = socket;
+            try{
+                out = new PrintWriter(this.socket.getOutputStream(), true);
+                in = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
+            }
+            catch( Exception e){
+                System.out.println("error creating the thread");
+            }
         }
         /*
         run function is called when hhtpfsThreads are created and start() is used on them.
         */
         public void run() {
             try{
-                BufferedWriter socketBufferedWriterOutputStream = new BufferedWriter(new OutputStreamWriter(this.socket.getOutputStream()));
-                BufferedReader socketBufferedReaderInputStream = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
-                String response = " ";
-                System.out.println("thread created");
-                while ((response = socketBufferedReaderInputStream.readLine()) != null) {
-                    System.out.println("response is: "+response);
-                }
-                this.socket.close();
-            }catch (IOException e) {
+                System.out.println("inside a new thread");
+                messageParser();
+                socket.close();
+                System.out.println("    thread completed\n");
+            } 
+            catch (Exception e) {
                 e.printStackTrace();
             }
         }
 
 
         //this needs to be modified to parse the message received from the client
-        public void messageParser(String message){
+        public void messageParser(){
+            //gives us what the first lign of the message is
+            //determines if its a get or post
+            try{
+                String line = in.readLine();
+                String temp ="";
+                //System.out.println(line);
+                if(line.contains("GET ")){
+                    String[] tokens=line.split(" ");
+                    String path=tokens[1];
+                    //System.out.println(path);
+                    String[] tokens_2=path.split("/");
+                    for(int i = 0; i<tokens_2.length;i++){
+                        filePath.add(tokens_2[i]);
+                    }
+                    get();
+                  //System.out.println("get done");
+                }
+                else if(line.contains("POST ")){
+                    
+                }
+                else{
+                    System.out.println("wrong format .... request dropped");
+                }
+                socket .close();
+            } 
+            catch(Exception e){
+                System.out.println("error in the message parser");
+            }
         
         }
         /**
          * get method that returns the content of the file
          */
-        public void get(String pathToDir){
+        public void get(){
 
             //call secureAccess() 
+
             //if no parameter 
+            if(filePath.size()==0){
                 //return content of the current directory
-            //else:
+                File directory = new File("./");
+                File[] contentOfDirectory = directory.listFiles();
+                int size=contentOfDirectory.length;
+                out.write("HTTP/1.0 200 OK\r\n");
+                out.write("Content-Length: "+size+"\r\n");
+                out.write("\r\n");
+                for (File object : contentOfDirectory) {
+                    if(object.isFile()){
+                        out.write("File name : "+object.getName()+"\n");
+                    }
+                    else if(object.isDirectory()){
+                        out.write("Directory name : "+object.getName()+"\n");
+                    }
+                }
+                out.flush();
+            }
+            else{
                 //call checkIfFileExist()
                     //return appropriate error message
                 //else:
                     //check for multiple reader / synchronization shit
                     //otherwise openFile()
+            }
+                
             //terminate thread
             //keep waiting for another request
         }
