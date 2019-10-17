@@ -1,5 +1,6 @@
 import java.net.*;
 import java.io.*;
+import java.lang.Integer;
 
 /*
 httpfs acts as the continously listening serverSocket which accepts any connection and then creates a seperate thread
@@ -10,7 +11,6 @@ public class httpfs {
     private static boolean isVerbose = false;
     private static boolean isGetRequest = false;
     private static boolean isPostRequest = false;
-    private static boolean needHelp = false;
     private static String portNumber = "8080";
     private static String pathToDir = ".";
 
@@ -20,7 +20,7 @@ public class httpfs {
     public static void main(String[] args) throws IOException {
 
         if (args.length >=4 || args.length == 0){
-            System.err.println("\nEnter httpfs help to get more information.\n");
+            System.err.println("\nEnter \"httpfs help\" to get more information.\n");
             System.exit(1);
         }else{
             cmdParser(args);
@@ -32,7 +32,7 @@ public class httpfs {
         try (ServerSocket serverSocket = new ServerSocket(portNum)){ 
             System.out.println("Server has been instantiated at port " + portNum);
             while (true) {
-                new httpfsThread(serverSocket.accept());
+                new httpfsThread(serverSocket.accept()).start();
 	        }
         } 
         catch (IOException e){
@@ -56,7 +56,7 @@ public class httpfs {
                 pathToDir = (args[i+1]);
                 i++;
             }else if (args[i].equalsIgnoreCase("help")){
-                needHelp = true;
+                help();
             }
         }
     }
@@ -66,12 +66,12 @@ public class httpfs {
     */
     public static void help(){
         String help = "\nhttpfs is a simple file server.\n" 
-                +"Usage: httpfs [-v] [-p PORT] [-d PATH-TO-DIR]\n\n\n"
-                +"\t-v Prints debugging messages.\n"
-                +"\t-p Specifies the port number that the server will listen and serve at."
+                +"\nUsage: httpfs [-v] [-p PORT] [-d PATH-TO-DIR]\n\n"
+                +"  -v  Prints debugging messages.\n"
+                +"  -p  Specifies the port number that the server will listen and serve at."
                 +"Default is 8080.\n"
-                +"\t-d Specifies the directory that the server will use to read/write"
-                +"requested files. Default is the current directory when launching the application.";
+                +"  -d  Specifies the directory that the server will use to read/write"
+                +"requested files. Default is the current directory when launching the application.\n";
 
         System.out.println(help);
         System.exit(0);
@@ -96,13 +96,29 @@ public class httpfs {
         */
         public void run() {
             try{
-                PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-                BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                System.out.println("Thread created!!!");
-                out.print("hello");
+                BufferedWriter socketBufferedWriterOutputStream = new BufferedWriter(new OutputStreamWriter(this.socket.getOutputStream()));
+                BufferedReader socketBufferedReaderInputStream = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
+                String response = " ";
+                System.out.println("thread created");
+                while ((response = socketBufferedReaderInputStream.readLine()) != null) {
+                    System.out.println("response is: "+response);
+                // if ((response.length()==0) && !isVerbose){  
+                //     System.out.println("response.length()==0) && !isVerbose");
+                //     StringBuilder res_recvd = new StringBuilder();
+                //     while ((response = socketBufferedReaderInputStream.readLine()) != null){
+                //         System.out.println("response is: "+response);
+                //         res_recvd.append(response).append("\r\n");
+                //     }
+                //     System.out.println(res_recvd.toString());
+                //     isVerbose = false;
+                //     break;
+                // }else if (isVerbose){
+                //         System.out.println(response);
+                //     }
+                }
                 //read the message
                 //call messageParser() which calls the appropriate get() or post()
-                socket.close();
+                this.socket.close();
             }catch (IOException e) {
                 e.printStackTrace();
             }
@@ -113,7 +129,6 @@ public class httpfs {
         public void messageParser(String message){
         
         }
-        
         /**
          * get method that returns the content of the file
          */
