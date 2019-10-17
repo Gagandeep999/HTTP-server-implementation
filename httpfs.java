@@ -1,10 +1,8 @@
 import java.net.*;
-import java.nio.file.DirectoryIteratorException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.Path;
-
 import java.io.*;
 import java.lang.Integer;
 
@@ -107,24 +105,8 @@ public class httpfs {
                 String response = " ";
                 System.out.println("thread created");
                 while ((response = socketBufferedReaderInputStream.readLine()) != null) {
-                    messageParser(response, socketBufferedWriterOutputStream);
                     System.out.println("response is: "+response);
-                // if ((response.length()==0) && !isVerbose){  
-                //     System.out.println("response.length()==0) && !isVerbose");
-                //     StringBuilder res_recvd = new StringBuilder();
-                //     while ((response = socketBufferedReaderInputStream.readLine()) != null){
-                //         System.out.println("response is: "+response);
-                //         res_recvd.append(response).append("\r\n");
-                //     }
-                //     System.out.println(res_recvd.toString());
-                //     isVerbose = false;
-                //     break;
-                // }else if (isVerbose){
-                //         System.out.println(response);
-                //     }
                 }
-                //read the message
-                //call messageParser() which calls the appropriate get() or post()
                 this.socket.close();
             }catch (IOException e) {
                 e.printStackTrace();
@@ -133,26 +115,7 @@ public class httpfs {
 
 
         //this needs to be modified to parse the message received from the client
-        public void messageParser(String message, BufferedWriter socketBufferedWriterOutputStream){
-            if (message.contains("GET")){
-                String[] splitMessage = message.split(" ");
-                if (splitMessage[1].equals("/")){
-                    pathToDir = splitMessage[1];
-                    // Path dir = Paths.get(pathToDir);
-                    // try( DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
-                    //     for (Path file : stream) {
-                    //         socketBufferedWriterOutputStream.write("how are you");
-                    //     }
-                    try{
-                        socketBufferedWriterOutputStream.write("gagan");
-                        socketBufferedWriterOutputStream.flush();
-                        // socketBufferedWriterOutputStream.close();
-                    }catch (IOException x){
-                        System.err.println(x);
-                    }
-                }
-
-            }
+        public void messageParser(String message){
         
         }
         /**
