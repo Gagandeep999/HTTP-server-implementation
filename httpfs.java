@@ -1,4 +1,10 @@
 import java.net.*;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.nio.file.Path;
 import java.io.*;
 import java.lang.Integer;
 import java.util.ArrayList;
@@ -8,57 +14,77 @@ import java.util.List;
 httpfs acts as the continously listening serverSocket which accepts any connection and then creates a seperate thread
 to take care of that request. (thus we enable the feature of simultaniously managing multiple requests *bonus feature)
 */
-
 public class httpfs {
 
     private static boolean isVerbose = false;
-    // private static boolean isGetRequest = false;
-    // private static boolean isPostRequest = false;
-    private static boolean needHelp = false;
+    private static boolean isGetRequest = false;
+    private static boolean isPostRequest = false;
     private static String portNumber = "8080";
     private static String pathToDir = ".";
-    // private static ServerSocket server;
 
-    /**
-     * main where we create our ServerSocket and listen for requests, creating threads for each request
-     */
+    /* 
+    main where we create our ServerSocket and listen for requests, creating threads for each request
+    */
     public static void main(String[] args) throws IOException {
-    if (args.length >=4){
-        System.err.println
-            ("Usage: "+
-             "\n     httpfs [-v] [-p PORT] [-d PATH-TO-DIR]");
-        System.exit(1);
-    }
-        //CmdParser()
-            //do all the shit
-            
 
-        boolean active = true;
+        if (args.length >=4 || args.length == 0){
+            System.err.println("\nEnter \"httpfs help\" to get more information.\n");
+            System.exit(1);
+        }else{
+            cmdParser(args);
+        }            
+
         //here we try and connect our serverSocket to the port, we use a catch try blocks, because the port might be occupied
         //and this would throw an exception
-        try (ServerSocket server = new ServerSocket(Integer.parseInt(portNumber))){ 
-            System.out.println("Server is now listening on port: "+ portNumber);
-            while (active) {
-	            new httpfsThread(server.accept()).start();
-            }
+        int portNum = Integer.parseInt(portNumber);
+        try (ServerSocket serverSocket = new ServerSocket(portNum)){ 
+            System.out.println("Server has been instantiated at port " + portNum);
+            while (true) {
+                new httpfsThread(serverSocket.accept()).start();
+	        }
         } 
         catch (IOException e){
             System.err.println("Could not connect to the port: " + portNumber);
             System.exit(-1);
         }
+    }        
+
+    /**
+    * This method takes the cmd args and parses them according to the different conditions of the application.
+    * @param args an array of the command line arguments.
+    */
+    public static void cmdParser(String[] args){
+        for (int i =0; i<args.length; i++){
+            if (args[i].equalsIgnoreCase("-v")){
+                isVerbose = true;
+            }else if (args[i].equalsIgnoreCase("-p")){
+                portNumber = args[i+1];
+                i++;
+            }else if (args[i].equalsIgnoreCase("-d")){
+                pathToDir = (args[i+1]);
+                i++;
+            }else if (args[i].equalsIgnoreCase("help")){
+                help();
+            }
+        }
     }
+
+    /**
+    * Prints the help menu.
+    */
     public static void help(){
         String help = "\nhttpfs is a simple file server.\n" 
-                +"Usage: httpfs [-v] [-p PORT] [-d PATH-TO-DIR]\n\n\n"
-                +"\t-v Prints debugging messages.\n"
-                +"\t-p Specifies the port number that the server will listen and serve at."
+                +"\nUsage: httpfs [-v] [-p PORT] [-d PATH-TO-DIR]\n\n"
+                +"  -v  Prints debugging messages.\n"
+                +"  -p  Specifies the port number that the server will listen and serve at."
                 +"Default is 8080.\n"
-                +"\t-d Specifies the directory that the server will use to read/write"
-                +"requested files. Default is the current directory when launching the application.";
-            System.out.println(help);
-            System.exit(0);
-        
-        }
+                +"  -d  Specifies the directory that the server will use to read/write"
+                +"requested files. Default is the current directory when launching the application.\n";
+
+        System.out.println(help);
+        System.exit(0);
+    }
+
     /*
     httpfsThread is a thread created by httpfs when a connection is accepted. In the thread we will 
     */
@@ -66,8 +92,6 @@ public class httpfs {
 
         private Socket socket = null;
         static List<String> fileData = new ArrayList<>();
-        //if size is 1 then we know its just a file
-        //if size is greater then we know we dive further into folders (to be created if dotn exist)
         static List<String> filePath = new ArrayList<>();
         static PrintWriter out=null;
         static BufferedReader in=null;
@@ -76,8 +100,8 @@ public class httpfs {
         Calls the super() to allocate a new thread and direct its private socket.
         */
         public httpfsThread(Socket socket) {
-            super("httpfsThread");
-            this.socket = socket; 
+            super();
+            this.socket = socket;
             try{
                 out = new PrintWriter(this.socket.getOutputStream(), true);
                 in = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
@@ -102,8 +126,7 @@ public class httpfs {
         }
 
         //this needs to be modified to parse the message received from the client
-        public void messageParser() throws Exception{
-
+        public void messageParser(){
             //gives us what the first lign of the message is
             //determines if its a get or post
             try{
@@ -132,13 +155,12 @@ public class httpfs {
             catch(Exception e){
                 System.out.println("error in the message parser");
             }
-            
+        
         }
         /**
          * get method that returns the content of the file
          */
         public void get(){
-    
             //call secureAccess() 
 
             //if no parameter 
@@ -240,4 +262,6 @@ public class httpfs {
             //close the Buffered Reader/Writer.
         }
     }
+
 }
+
