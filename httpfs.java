@@ -17,8 +17,6 @@ to take care of that request. (thus we enable the feature of simultaniously mana
 public class httpfs {
 
     private static boolean isVerbose = false;
-    private static boolean isGetRequest = false;
-    private static boolean isPostRequest = false;
     private static String portNumber = "8080";
     private static String pathToDir = ".";
 
@@ -27,7 +25,7 @@ public class httpfs {
     */
     public static void main(String[] args) throws IOException {
 
-        if (args.length >=4 || args.length == 0){
+        if (args.length >=4){
             System.err.println("\nEnter \"httpfs help\" to get more information.\n");
             System.exit(1);
         }else{
@@ -95,6 +93,8 @@ public class httpfs {
         static List<String> filePath = new ArrayList<>();
         static PrintWriter out=null;
         static BufferedReader in=null;
+        private static boolean isGetRequest = false;
+        private static boolean isPostRequest = false;
 
         /* 
         Calls the super() to allocate a new thread and direct its private socket.
@@ -131,21 +131,21 @@ public class httpfs {
             //determines if its a get or post
             try{
                 String line = in.readLine();
-                String temp ="";
                 //System.out.println(line);
                 if(line.contains("GET ")){
+                    isGetRequest=true;
                     String[] tokens=line.split(" ");
-                    String path=tokens[1];
-                    //System.out.println(path);
-                    String[] tokens_2=path.split("/");
-                    for(int i = 0; i<tokens_2.length;i++){
-                        filePath.add(tokens_2[i]);
-                    }
-                    get();
-                  //System.out.println("get done");
+                    String path="."+tokens[1];
+                    // String[] tokens_2=path.split("/");
+                    // for(int i = 0; i<tokens_2.length;i++){
+                    //     filePath.add(tokens_2[i]);
+                    // }
+                    //check if file exists
+                    checkIfFileExist(path);
+                    get(path);
                 }
                 else if(line.contains("POST ")){
-                    
+                    isPostRequest=true;
                 }
                 else{
                     System.out.println("wrong format .... request dropped");
@@ -160,13 +160,13 @@ public class httpfs {
         /**
          * get method that returns the content of the file
          */
-        public void get(){
+        public void get(String path){
             //call secureAccess() 
-
             //if no parameter 
-            if(filePath.size()==0){
+            System.out.println(path);
+            if(path.equals("./")){
                 //return content of the current directory
-                File directory = new File("./");
+                File directory = new File(pathToDir);
                 File[] contentOfDirectory = directory.listFiles();
                 int size=contentOfDirectory.length;
                 out.write("HTTP/1.0 200 OK\r\n");
@@ -183,21 +183,16 @@ public class httpfs {
                 out.flush();
             }
             else{
-                //call checkIfFileExist()
-                    //return appropriate error message
-                //else:
                     //check for multiple reader / synchronization shit
                     //otherwise openFile()
+                    openFileAndPerformOperation(path);
             }
-                
-            //terminate thread
-            //keep waiting for another request
         }
 
         /**
          * post method that writes to the specified file
          */
-        public void post(String pathToDir){
+        public void post(String path){
 
             //call secureAccess() 
             //go to the directory
@@ -214,7 +209,7 @@ public class httpfs {
          * this method is to check if the pathToDir is not outside the file server
          * @param pathToDir
          */
-        public void secureAccess(String pathToDir){
+        public void secureAccess(String path){
 
             //check if pathToDir is outside of current directory scope
             //if yes
@@ -232,34 +227,67 @@ public class httpfs {
         //
         //create also the folders
         //
-        public boolean checkIfFileExist(String pathToDir){
+        public void checkIfFileExist(String path){
             //this is called after the secureAccess() method
             //we already know if it is a get/post request
             //if the request if post :
+            if(isGetRequest){
+                File tempFile = new File(path);
+                boolean exists = tempFile.exists();
+                if(!exists){
+                    out.write("HTTP/1.0 404 Not Found\r\n\r\n");
+                    out.flush();
+                   try{
+                       socket.close();
+                   }catch(Exception e){
+                        System.out.println("error in the checkFileExist");
+                   }
+                }
+            }
+            if(isPostRequest){
                 // either create the file or override and return true
-            //else:
-                //just check (Find out what happens if file exist but there is nothing maybe!!!)
-            //return true/false
-
-            return true;
-
+            }
         }
 
         /**
          * this can be called by get() and post()
          * @param pathToDir
          */
-        public void openFileAndPerformOperation(String pathToDir){
-            //buffered reader/writer can be defined here only, need not be static variables
-
+        public void openFileAndPerformOperation(String path){
+        
             //this is called after the checkIfFileExist()
             //we already know if it is a get/post request
             //based on the type of request open Buffered Reader/Writer and perform realted operations.
             //if post:
-                // open file and write to it
-            //else:
+            if(isGetRequest){
                 //open file and read contents
-            //close the Buffered Reader/Writer.
+                try{
+                    File file = new File(path);
+                    //System.out.println(path);
+                    boolean exists = file.exists();
+                    //System.out.println(exists);
+                    BufferedReader input_file = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
+                    String line="";
+                    String line_ = "";
+                    while((line = input_file.readLine()) != null) {
+                        line_ =line_.concat(line)+"\n";
+                    }
+                    int size=line_.length();
+                    out.write("HTTP/1.0 200 OK\r\n");
+                    out.write("Content-Length: "+size+"\r\n");
+                    out.write("Content-Type: text/html\r\n");
+                    out.write("\r\n");
+                    out.write(line_);
+                    out.flush();
+                    //the data
+                    input_file.close();
+                } catch (Exception e){
+                    System.out.println("error in the openFileAndPerformOperation");
+                }
+            }
+            else if(isPostRequest){
+                // open file and write to it
+            }    
         }
     }
 
