@@ -128,7 +128,6 @@ public class httpfs {
         //this needs to be modified to parse the message received from the client
         public void messageParser(){
             //gives us what the first lign of the message is
-            //determines if its a get or post
             try{
                 String line = in.readLine();
                 //System.out.println(line);
@@ -136,16 +135,36 @@ public class httpfs {
                     isGetRequest=true;
                     String[] tokens=line.split(" ");
                     String path="."+tokens[1];
-                    // String[] tokens_2=path.split("/");
-                    // for(int i = 0; i<tokens_2.length;i++){
-                    //     filePath.add(tokens_2[i]);
-                    // }
-                    //check if file exists
                     checkIfFileExist(path);
                     get(path);
                 }
                 else if(line.contains("POST ")){
                     isPostRequest=true;
+                    String[] tokens=line.split(" ");
+                    String path="."+tokens[1];
+                    String body="";
+                    while(true) {
+                        //do nothing until we hit the body delimiter (assignment doesnt really care for that
+                        line = in.readLine();
+                        System.out.println("line is: "+line);
+                        if(line.equals("")){ //hit the delimiter
+                            System.out.println("before break");
+                            break;
+                        }
+                    }
+                    while(true) {
+                        line = in.readLine();
+                        System.out.println(line+"hello");
+                        if(line.equals("")){
+                            System.out.println("hit the selimiter"); //hit the delimiter
+                            break;
+                        }
+                        System.out.println(line+"sup"); 
+                        body = body.concat(line+"\n"); 
+                    }
+                    System.out.println(body);
+                    checkIfFileExist(path);
+                    post(path,body);
                 }
                 else{
                     System.out.println("wrong format .... request dropped");
@@ -163,7 +182,7 @@ public class httpfs {
         public void get(String path){
             //call secureAccess() 
             //if no parameter 
-            System.out.println(path);
+            //System.out.println(path);
             if(path.equals("./")){
                 //return content of the current directory
                 File directory = new File(pathToDir);
@@ -192,7 +211,7 @@ public class httpfs {
         /**
          * post method that writes to the specified file
          */
-        public void post(String path){
+        public void post(String path, String body){
 
             //call secureAccess() 
             //go to the directory
@@ -209,6 +228,7 @@ public class httpfs {
          * this method is to check if the pathToDir is not outside the file server
          * @param pathToDir
          */
+        //do this by checking of th epath is a child to the current directory.
         public void secureAccess(String path){
 
             //check if pathToDir is outside of current directory scope
@@ -255,7 +275,6 @@ public class httpfs {
          */
         public void openFileAndPerformOperation(String path){
         
-            //this is called after the checkIfFileExist()
             //we already know if it is a get/post request
             //based on the type of request open Buffered Reader/Writer and perform realted operations.
             //if post:
@@ -286,10 +305,19 @@ public class httpfs {
                 }
             }
             else if(isPostRequest){
+                //this is called after the checkIfFileExist()
                 // open file and write to it
+                
             }    
         }
     }
 
 }
 
+//use this to split the path into the seperate folders and shit
+
+// String[] tokens_2=path.split("/");
+// for(int i = 0; i<tokens_2.length;i++){
+//     filePath.add(tokens_2[i]);
+// }
+ //check if file exists
