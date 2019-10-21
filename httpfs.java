@@ -52,17 +52,35 @@ public class httpfs {
     * @param args an array of the command line arguments.
     */
     public static void cmdParser(String[] args){
+        boolean nextValid=false;
         for (int i =0; i<args.length; i++){
             if (args[i].equalsIgnoreCase("-v")){
-                isVerbose = true;
+                isDebugging = true;
+                nextValid=true;
             }else if (args[i].equalsIgnoreCase("-p")){
                 portNumber = args[i+1];
                 i++;
+                nextValid=true;
+                //need to check if the directory given is not a false directory.
             }else if (args[i].equalsIgnoreCase("-d")){
                 pathToDir = (args[i+1]);
+                File tempFile = new File(pathToDir);
+                boolean exists = tempFile.exists();
+                if(!exists){
+                    System.out.println("\n      //////Invalid Directory submitted.////////  \n");
+                    System.exit(0);
+                }
                 i++;
+                nextValid=true;
             }else if (args[i].equalsIgnoreCase("help")){
                 help();
+            }else{
+                //hit something wrong in the format
+                if(nextValid==false){
+                    System.out.println("\n      //////Invalid format submitted.////////  \n\nHere are the httpfs help instructions.");
+                    help();
+                }
+                nextValid=false;
             }
         }
     }
@@ -89,8 +107,6 @@ public class httpfs {
     private static class httpfsThread extends Thread{
 
         private Socket socket = null;
-        static List<String> fileData = new ArrayList<>();
-        static List<String> filePath = new ArrayList<>();
         static PrintWriter out=null;
         static BufferedReader in=null;
         private static boolean isGetRequest = false;
@@ -146,21 +162,17 @@ public class httpfs {
                     while(true) {
                         //do nothing until we hit the body delimiter (assignment doesnt really care for that
                         line = in.readLine();
-                        System.out.println("line is: "+line);
                         if(line.equals("")){ //hit the delimiter
-                            System.out.println("before break");
                             break;
                         }
                     }
                     while(true) {
                         line = in.readLine();
                         if(line.equals("")){
-                            // System.out.println("hit the selimiter"); //hit the delimiter
                             break;
                         } 
                         body = body.concat(line+"\n"); 
                     }
-                    //System.out.println(body);
                     checkIfFileExist(path);
                     post(path,body);
                 }
@@ -178,9 +190,10 @@ public class httpfs {
          * get method that returns the content of the file
          */
         public void get(String path){
+
             //call secureAccess() 
+
             //if no parameter 
-            //System.out.println(path);
             if(path.equals("./")){
                 //return content of the current directory
                 File directory = new File(pathToDir);
@@ -200,7 +213,9 @@ public class httpfs {
                 out.flush();
             }
             else{
+
                     //check for multiple reader / synchronization shit
+
                     openFileAndPerformOperation(path);
             }
         }
@@ -211,7 +226,9 @@ public class httpfs {
         public void post(String path, String body){
 
             //call secureAccess() 
+
             openFileAndPerformOperation(path,body);
+
             //check for the multiple writers / synchronization shit
         }
 
@@ -280,12 +297,7 @@ public class httpfs {
          * @param path
          */
         public void openFileAndPerformOperation(String path){
-        
-            //we already know if it is a get/post request
-            //based on the type of request open Buffered Reader/Writer and perform realted operations.
-            //if post:
             
-                //open file and read contents
             try{
                 File file = new File(path);
                 BufferedReader input_file = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
