@@ -16,7 +16,7 @@ to take care of that request. (thus we enable the feature of simultaniously mana
 */
 public class httpfs {
 
-    private static boolean isVerbose = false;
+    private static boolean isDebugging = false;
     private static String portNumber = "8080";
     private static String pathToDir = ".";
 
@@ -25,7 +25,7 @@ public class httpfs {
     */
     public static void main(String[] args) throws IOException {
 
-        if (args.length >=4){
+        if (args.length >=5){
             System.err.println("\nEnter \"httpfs help\" to get more information.\n");
             System.exit(1);
         }else{
@@ -154,15 +154,13 @@ public class httpfs {
                     }
                     while(true) {
                         line = in.readLine();
-                        System.out.println(line+"hello");
                         if(line.equals("")){
-                            System.out.println("hit the selimiter"); //hit the delimiter
+                            // System.out.println("hit the selimiter"); //hit the delimiter
                             break;
-                        }
-                        System.out.println(line+"sup"); 
+                        } 
                         body = body.concat(line+"\n"); 
                     }
-                    System.out.println(body);
+                    //System.out.println(body);
                     checkIfFileExist(path);
                     post(path,body);
                 }
@@ -203,7 +201,6 @@ public class httpfs {
             }
             else{
                     //check for multiple reader / synchronization shit
-                    //otherwise openFile()
                     openFileAndPerformOperation(path);
             }
         }
@@ -214,14 +211,8 @@ public class httpfs {
         public void post(String path, String body){
 
             //call secureAccess() 
-            //go to the directory
-            //check if file exists, 
-                    //if file doesn't... create it, 
-                    //otherwise overwrite=true|false(need more discussion)
-            //call openFileAndPerformOperation()
+            openFileAndPerformOperation(path,body);
             //check for the multiple writers / synchronization shit
-            //terminate thread
-            //keep waiting for another request
         }
 
         /**
@@ -266,58 +257,70 @@ public class httpfs {
             }
             if(isPostRequest){
                 // either create the file or override and return true
+                int index = path.lastIndexOf("/");
+                String directories = path.substring(0, index);
+                File file= new File(directories);
+                boolean exists = file.exists();
+                //create them if one of the folders doesnt exist.
+                if(!exists){
+                    file.mkdirs();
+                }
+                File textFile = new File(path);
+                //Create the file
+                try{
+                 textFile.createNewFile();    
+                }catch (Exception e){
+                    System.out.println("error in the checkIfFileExists");
+                }
             }
         }
 
         /**
-         * this can be called by get() and post()
-         * @param pathToDir
+         * this can be called by get()
+         * @param path
          */
         public void openFileAndPerformOperation(String path){
         
             //we already know if it is a get/post request
             //based on the type of request open Buffered Reader/Writer and perform realted operations.
             //if post:
-            if(isGetRequest){
+            
                 //open file and read contents
-                try{
-                    File file = new File(path);
-                    //System.out.println(path);
-                    boolean exists = file.exists();
-                    //System.out.println(exists);
-                    BufferedReader input_file = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
-                    String line="";
-                    String line_ = "";
-                    while((line = input_file.readLine()) != null) {
-                        line_ =line_.concat(line)+"\n";
-                    }
-                    int size=line_.length();
-                    out.write("HTTP/1.0 200 OK\r\n");
-                    out.write("Content-Length: "+size+"\r\n");
-                    out.write("Content-Type: text/html\r\n");
-                    out.write("\r\n");
-                    out.write(line_);
-                    out.flush();
-                    //the data
-                    input_file.close();
-                } catch (Exception e){
-                    System.out.println("error in the openFileAndPerformOperation");
+            try{
+                File file = new File(path);
+                BufferedReader input_file = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
+                String line="";
+                String line_ = "";
+                while((line = input_file.readLine()) != null) {
+                    line_ =line_.concat(line)+"\n";
                 }
+                int size=line_.length();
+                out.write("HTTP/1.0 200 OK\r\n");
+                out.write("Content-Length: "+size+"\r\n");
+                out.write("Content-Type: text/html\r\n");
+                out.write("\r\n");
+                out.write(line_);
+                out.flush();
+                //the data
+                input_file.close();
+            } catch (Exception e){
+                System.out.println("error in the openFileAndPerformOperation get");
             }
-            else if(isPostRequest){
-                //this is called after the checkIfFileExist()
-                // open file and write to it
-                
-            }    
+        }
+            
+        /**
+        * this can be called by post()
+        * @param path @param body
+        */
+        public void openFileAndPerformOperation(String path,String body){
+            try{
+                File textFile = new File(path);
+                FileWriter writer = new FileWriter(textFile);
+                writer.write(body);
+                writer.close();
+            } catch (Exception e){
+                System.out.println("error in the openFileAndPerformOperation post");
+            }
         }
     }
-
 }
-
-//use this to split the path into the seperate folders and shit
-
-// String[] tokens_2=path.split("/");
-// for(int i = 0; i<tokens_2.length;i++){
-//     filePath.add(tokens_2[i]);
-// }
- //check if file exists
