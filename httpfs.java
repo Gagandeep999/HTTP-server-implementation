@@ -150,9 +150,16 @@ public class httpfs {
                 if(line.contains("GET ")){
                     isGetRequest=true;
                     String[] tokens=line.split(" ");
+                    //CHECK IF IT ALREADY HAS A "."
                     String path="."+tokens[1];
-                    checkIfFileExist(path);
-                    get(path);
+                    if(secureAccess(path)){
+                        checkIfFileExist(path);
+                        get(path);
+                    }
+                    else{
+                        out.write("HTTP/1.0 403 Forbidden\r\n\r\n");
+                        out.flush();
+                    }
                 }
                 else if(line.contains("POST ")){
                     isPostRequest=true;
@@ -173,8 +180,19 @@ public class httpfs {
                         } 
                         body = body.concat(line+"\n"); 
                     }
-                    checkIfFileExist(path);
-                    post(path,body);
+                    if(secureAccess(path)){
+                        checkIfFileExist(path);
+                        post(path,body);
+                    }
+                    else{
+                        out.write("HTTP/1.0 403 Forbidden\r\n\r\n");
+                        out.flush();
+                        try{
+                            socket.close();
+                        } catch(Exception e){
+                            System.out.println("error in the messageParser socket close");
+                        }
+                    }
                 }
                 else{
                     System.out.println("wrong format .... request dropped");
@@ -190,8 +208,6 @@ public class httpfs {
          * get method that returns the content of the file
          */
         public void get(String path){
-
-            //call secureAccess() 
 
             //if no parameter 
             if(path.equals("./")){
@@ -213,9 +229,7 @@ public class httpfs {
                 out.flush();
             }
             else{
-
                     //check for multiple reader / synchronization shit
-
                     openFileAndPerformOperation(path);
             }
         }
@@ -225,7 +239,7 @@ public class httpfs {
          */
         public void post(String path, String body){
 
-            //call secureAccess() 
+            // secureAccess(path);
 
             openFileAndPerformOperation(path,body);
 
@@ -237,14 +251,21 @@ public class httpfs {
          * @param pathToDir
          */
         //do this by checking of th epath is a child to the current directory.
-        public void secureAccess(String path){
+        public boolean secureAccess(String path){
 
             //check if pathToDir is outside of current directory scope
+            String sub_path=path.substring(0,2);
+            //System.out.println(sub_path);
+            if(sub_path.equals("..")){
+                //we have left the scope of our directory
+                return false;
+                
+            }
             //if yes
                 //send error message and terminate thread in this method
             //else
                 // continue in normal order of execution
-
+            return true;
         }
 
         /**
@@ -272,7 +293,7 @@ public class httpfs {
                    }
                 }
             }
-            if(isPostRequest){
+            else if(isPostRequest){
                 // either create the file or override and return true
                 int index = path.lastIndexOf("/");
                 String directories = path.substring(0, index);
@@ -315,9 +336,7 @@ public class httpfs {
                 out.flush();
                 //the data
                 input_file.close();
-            } catch (Exception e){
-                System.out.println("error in the openFileAndPerformOperation get");
-            }
+            } catch (Exception e){}
         }
             
         /**
@@ -326,6 +345,7 @@ public class httpfs {
         */
         public void openFileAndPerformOperation(String path,String body){
             try{
+                //System.out.println(path);
                 File textFile = new File(path);
                 FileWriter writer = new FileWriter(textFile);
                 writer.write(body);
