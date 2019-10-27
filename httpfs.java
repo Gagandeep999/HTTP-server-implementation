@@ -1,264 +1,367 @@
 import java.net.*;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-import java.nio.file.Path;
 import java.io.*;
 import java.lang.Integer;
+import java.nio.file.DirectoryIteratorException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Scanner;
+import java.util.logging.Logger;
 
 /*
 httpfs acts as the continously listening serverSocket which accepts any connection and then creates a seperate thread
 to take care of that request. (thus we enable the feature of simultaniously managing multiple requests *bonus feature)
 */
 public class httpfs {
-
     private static boolean isVerbose = false;
-    private static boolean isGetRequest = false;
-    private static boolean isPostRequest = false;
     private static String portNumber = "8080";
-    private static String pathToDir = ".";
+    private static String currentDirectory = "./cwd";
+    private static Logger LOGGER = Logger.getLogger("httpfs logger:");
 
-    /* 
-    main where we create our ServerSocket and listen for requests, creating threads for each request
-    */
+    /*
+     * main where we create our ServerSocket and listen for requests, creating
+     * threads for each request
+     */
     public static void main(String[] args) throws IOException {
 
-        if (args.length >=4 || args.length == 0){
+        if (args.length >= 6 || args.length == 0) {
             System.err.println("\nEnter \"httpfs help\" to get more information.\n");
             System.exit(1);
-        }else{
+        } else {
             cmdParser(args);
-        }            
+        }
 
-        //here we try and connect our serverSocket to the port, we use a catch try blocks, because the port might be occupied
-        //and this would throw an exception
-        int portNum = Integer.parseInt(portNumber);
-        try (ServerSocket serverSocket = new ServerSocket(portNum)){ 
-            System.out.println("Server has been instantiated at port " + portNum);
+        try (ServerSocket serverSocket = new ServerSocket(Integer.parseInt(portNumber))) {
+            System.out.println("Server has been instantiated at port " + portNumber);
             while (true) {
-                new httpfsThread(serverSocket.accept()).start();
-	        }
-        } 
-        catch (IOException e){
+                Socket clientSocket = serverSocket.accept();
+                new httpfsThread(clientSocket).start();
+            }
+        } catch (IOException e) {
             System.err.println("Could not connect to the port: " + portNumber);
             System.exit(-1);
         }
-    }        
+    }
 
     /**
-    * This method takes the cmd args and parses them according to the different conditions of the application.
-    * @param args an array of the command line arguments.
-    */
-    public static void cmdParser(String[] args){
-        for (int i =0; i<args.length; i++){
-            if (args[i].equalsIgnoreCase("-v")){
+     * This method takes the cmd args and parses them according to the different
+     * conditions of the application.
+     * 
+     * @param args an array of the command line arguments.
+     */
+    public static void cmdParser(String[] args) {
+        for (int i = 0; i < args.length; i++) {
+            if (args[i].equalsIgnoreCase("-v")) {
                 isVerbose = true;
-            }else if (args[i].equalsIgnoreCase("-p")){
-                portNumber = args[i+1];
+            } else if (args[i].equalsIgnoreCase("-p")) {
+                portNumber = args[i + 1];
                 i++;
-            }else if (args[i].equalsIgnoreCase("-d")){
-                pathToDir = (args[i+1]);
+            } else if (args[i].equalsIgnoreCase("-d")) {
+                currentDirectory = (args[i + 1]);
                 i++;
-            }else if (args[i].equalsIgnoreCase("help")){
+            } else if (args[i].equalsIgnoreCase("help")) {
                 help();
             }
         }
     }
 
     /**
-    * Prints the help menu.
-    */
-    public static void help(){
-        String help = "\nhttpfs is a simple file server.\n" 
-                +"\nUsage: httpfs [-v] [-p PORT] [-d PATH-TO-DIR]\n\n"
-                +"  -v  Prints debugging messages.\n"
-                +"  -p  Specifies the port number that the server will listen and serve at."
-                +"Default is 8080.\n"
-                +"  -d  Specifies the directory that the server will use to read/write"
-                +"requested files. Default is the current directory when launching the application.\n";
+     * Prints the help menu.
+     */
+    public static void help() {
+        String help = "\nhttpfs is a simple file server.\n" + "\nUsage: httpfs [-v] [-p PORT] [-d PATH-TO-DIR]\n\n"
+                + "  -v  Prints debugging messages.\n"
+                + "  -p  Specifies the port number that the server will listen and serve at." + "Default is 8080.\n"
+                + "  -d  Specifies the directory that the server will use to read/write"
+                + "requested files. Default is the current directory when launching the application.\n";
 
         System.out.println(help);
         System.exit(0);
     }
 
     /*
-    httpfsThread is a thread created by httpfs when a connection is accepted. In the thread we will 
-    */
+     * httpfsThread is a thread created by httpfs when a connection is accepted. In
+     * the thread we will
+     */
     private static class httpfsThread extends Thread {
 
-        private Socket socket = null;
-        static List<String> fileData = new ArrayList<>();
-        static List<String> filePath = new ArrayList<>();
-        static PrintWriter out=null;
-        static BufferedReader in=null;
+        private static Socket socket = null;
+        private static BufferedWriter out = null;
+        private static BufferedReader in = null;
+        private static String[] requestParser = new String[3];
+        private static String requestType = "";
+        private static String pathFromClient = "";
+        private static String http = "";
+        private static String statusCode = "";
+        private static String headerInfo = "";
+        private static String dataFromClient = "";
+        private static String bodyForClient = "";
+        private static String completeMessage = "";
+        private static String timeStamp = "";
+        private static boolean overWrite = false;
 
-        /* 
-        Calls the super() to allocate a new thread and direct its private socket.
-        */
-        public httpfsThread(Socket socket) {
+        /**
+         * This is the constrcutor that initialises all the variables for every requests receieved.
+         * @param Socket
+         */
+        public httpfsThread(Socket Socket) {
             super();
-            this.socket = socket;
-            try{
-                out = new PrintWriter(this.socket.getOutputStream(), true);
-                in = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
-            }
-            catch( Exception e){
-                System.out.println("error creating the thread");
-            }
-        }
-        /*
-        run function is called when hhtpfsThreads are created and start() is used on them.
-        */
-        public void run() {
-            try{
-                System.out.println("inside a new thread");
-                messageParser();
-                socket.close();
-                System.out.println("    thread completed\n");
-            } 
-            catch (Exception e) {
+            try {
+                requestType = "";
+                pathFromClient = "";
+                http = "";
+                statusCode = "";
+                headerInfo = "";
+                dataFromClient = "";
+                bodyForClient = "";
+                completeMessage = "";
+                socket = Socket;
+                timeStamp = new SimpleDateFormat("dd/MM/yyyy:HH:mm:ss").format(Calendar.getInstance().getTime());
+                out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+                in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         }
 
-
-        //this needs to be modified to parse the message received from the client
-        public void messageParser(){
-            //gives us what the first lign of the message is
-            //determines if its a get or post
-            try{
-                String line = in.readLine();
-                String temp ="";
-                //System.out.println(line);
-                if(line.contains("GET ")){
-                    String[] tokens=line.split(" ");
-                    String path=tokens[1];
-                    //System.out.println(path);
-                    String[] tokens_2=path.split("/");
-                    for(int i = 0; i<tokens_2.length;i++){
-                        filePath.add(tokens_2[i]);
-                    }
-                    get();
-                  //System.out.println("get done");
-                }
-                else if(line.contains("POST ")){
-                    
-                }
-                else{
-                    System.out.println("wrong format .... request dropped");
-                }
-                socket .close();
-            } 
-            catch(Exception e){
-                System.out.println("error in the message parser");
-            }
-        
-        }
         /**
-         * get method that returns the content of the file
+         * This method is the starting point of every thread.
          */
-        public void get(){
+        public void run() {
+            try {
+                String response = "";
+                response = in.readLine();
+                requestParser = response.split(" ");
+                requestType = requestParser[0];
+                pathFromClient = requestParser[1];
+                http = requestParser[2];
 
-            //call secureAccess() 
+                //we take the first line of the request and split it to get what kind of 
+                //request it is and pass to requestProcesser()
+                requestProcessor(requestType, pathFromClient);
 
-            //if no parameter 
-            if(filePath.size()==0){
-                //return content of the current directory
-                File directory = new File("./");
-                File[] contentOfDirectory = directory.listFiles();
-                int size=contentOfDirectory.length;
-                out.write("HTTP/1.0 200 OK\r\n");
-                out.write("Content-Length: "+size+"\r\n");
-                out.write("\r\n");
-                for (File object : contentOfDirectory) {
-                    if(object.isFile()){
-                        out.write("File name : "+object.getName()+"\n");
-                    }
-                    else if(object.isDirectory()){
-                        out.write("Directory name : "+object.getName()+"\n");
-                    }
-                }
+                //once all the processing is finished the "completeMessage" is send to the
+                //client and socket is closed.
+                out.write(completeMessage);
                 out.flush();
-            }
-            else{
-                //call checkIfFileExist()
-                    //return appropriate error message
-                //else:
-                    //check for multiple reader / synchronization shit
-                    //otherwise openFile()
-            }
+                socket.shutdownOutput();
                 
-            //terminate thread
-            //keep waiting for another request
+                StringBuilder log = new StringBuilder(socket.getInetAddress().toString()+":");
+                log.append(socket.getLocalPort()+" ");
+                log.append(response+" ");
+                log.append(statusCode.toString()+" ");
+                log.append(bodyForClient.getBytes("UTF-8").length);
+                // System.out.println(log);
+                if (httpfs.isVerbose){
+                    httpfs.LOGGER.info(log.toString());
+                }
+                BufferedWriter br = new BufferedWriter(new PrintWriter(new FileWriter("./cwd/log.txt", true)));
+                br.write("["+timeStamp+"] "+log.toString());
+                br.flush();
+                br.close();
+                socket.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
         /**
-         * post method that writes to the specified file
+         * We get the header from the message receieved from the client and data if it's a post request.
+         * Then deciphers what kind of request it is and calls the respective functions.
+         * Once we are done with processing we call the createMessage() method that creates the 
+         * message to be sent to the client.
+         * @param requestType
+         * @param pathFromClient
          */
-        public void post(String pathToDir){
+        private static void requestProcessor(String requestType, String pathFromClient) {
 
-            //call secureAccess() 
-            //go to the directory
-            //check if file exists, 
-                    //if file doesn't... create it, 
-                    //otherwise overwrite=true|false(need more discussion)
-            //call openFileAndPerformOperation()
-            //check for the multiple writers / synchronization shit
-            //terminate thread
-            //keep waiting for another request
+            getAdditionalHeader_Data();
+            processHeader(headerInfo);
+            if (requestType.equals("GET")) {
+                get(pathFromClient);
+            } else if (requestType.equals("POST")) {
+                post(pathFromClient, dataFromClient);
+            } else {
+                statusCode = "400 BAD REQUEST";
+            }
+
+            createMessage(http, statusCode, headerInfo, bodyForClient);
+        }
+
+
+        /**
+         * This mehtod is used to get all the information from the client's message and store it.
+         */
+        private static void getAdditionalHeader_Data() {
+            String response = "";
+            boolean hasHeader = true;
+            boolean hasData = true;
+            try {
+                while (in.ready() && hasHeader) {
+                    response = in.readLine();
+                    if (response.isEmpty()) {
+                        hasHeader = false;
+                    } else {
+                        headerInfo = headerInfo.concat(response);
+                        headerInfo = headerInfo.concat("\n");
+                    }
+                }
+                while (in.ready() && hasData) {
+                    response = in.readLine();
+                    if (response.isEmpty()) {
+                        hasData = false;
+                    } else {
+                        dataFromClient = dataFromClient.concat(response);
+                        dataFromClient = dataFromClient.concat("\n");
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
         /**
-         * this method is to check if the pathToDir is not outside the file server
+         * This method has one functionality for this assignment.
+         * It reads through all the headers from the client to check for overwrite option when posting.
+         * @param headerInfo
+         */
+        private static void processHeader(String headerInfo) {
+            Scanner s = new Scanner(headerInfo);
+            s.useDelimiter("\n");
+            while (s.hasNextLine()){
+                String eachLine = s.nextLine();
+                if (eachLine.contains("overwrite")){
+                    String[] postInfo = eachLine.split(":");
+                    overWrite = Boolean.valueOf(postInfo[1]);
+                }
+            }
+            s.close();
+        }
+
+
+        /**
+         * This mehtod is used to create the reply that will be sent back to the client.
+         * @param http
+         * @param statusCode
+         * @param headerInfo
+         * @param bodyForClient
+         */
+        private static void createMessage(String http, String statusCode, String headerInfo, String bodyForClient) {
+            completeMessage = http + " " + statusCode + "\nDate: " + timeStamp +"\r\n\r\n";
+            if (headerInfo.length() != 0) {
+                completeMessage = completeMessage.replace("\r\n\r\n", ("\r\n" + headerInfo + "\r\n"));
+            }
+            if (bodyForClient.length() != 0) {
+                completeMessage = completeMessage.concat(bodyForClient + "\r\n");
+            }
+            // System.out.println("completeMessage: \n" + completeMessage);
+        }
+
+
+        /**
+         * This method performs a get request. If the pathToDir is a driectory it returns list of
+         * files and folders it contains, otherwise it returns the contents of the file.
          * @param pathToDir
          */
-        public void secureAccess(String pathToDir){
+        private static void get(String pathToDir) {
+            bodyForClient = "";
+            int content_len = 0;
+            if (!secureAccess(pathFromClient)) {
+                return;
+            }
+            pathToDir = (currentDirectory + pathToDir);
+            Path dir = Paths.get(pathToDir);
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
+                for (Path file : stream) {
+                    statusCode = "200 OK";
+                    bodyForClient = bodyForClient.concat(file.getFileName().toString() + "\n");
+                }
+            } catch (IOException | DirectoryIteratorException x) {
+                File file = dir.toFile();
+                if (file.exists()) {
+                    try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+                        StringBuilder sb = new StringBuilder();
+                        String line = br.readLine();
+                        while (line != null) {
+                            sb.append(line);
+                            sb.append(System.lineSeparator());
+                            line = br.readLine();
+                        }
+                        statusCode = "200 OK";
+                        bodyForClient = sb.toString();
+                        content_len = bodyForClient.length();
+                        headerInfo = headerInfo.concat("Content-Length: "+content_len+"\n");
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                } else {
+                    statusCode = "404 NOT FOUND";
+                }
+            }
+        }
 
-            //check if pathToDir is outside of current directory scope
-            //if yes
-                //send error message and terminate thread in this method
-            //else
-                // continue in normal order of execution
 
+        /**
+         * This method performs a post request. If the provided path is an exisiting directory then it 
+         * returns a 400 BAD REQUEST, otherwise creates all the folders/subfolders and the file
+         * and write the DataInfoFromClient into the file.
+         * @param pathToDir
+         * @param dataFromClient
+         */
+        private static void post(String pathToDir, String dataFromClient) {
+            Path parentPath = null;
+            File parentFile = null;
+            BufferedWriter br = null;
+
+            pathToDir = (currentDirectory + pathToDir);
+            Path dir = Paths.get(pathToDir);
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
+                statusCode = "400 BAD REQUEST";
+            } catch (IOException | DirectoryIteratorException x) {
+                do {
+                    parentPath = dir.getParent();
+                    parentFile = parentPath.toFile();
+                    if (!parentFile.isDirectory()) {
+                        parentFile.mkdirs();
+                        continue;
+                    } else {
+                        break;
+                    }
+                } while (true);
+                File file = dir.toFile();
+                try {
+                    if (overWrite){
+                        br = new BufferedWriter(new PrintWriter(new FileWriter(file, true)));
+                    }else{
+                        br = new BufferedWriter(new PrintWriter(new FileWriter(file, false)));
+                    }
+                    statusCode = "200 OK";
+                    br.write(dataFromClient);
+                    br.flush();
+                    br.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
 
         /**
-         * can be called by get() and post().Check if the file exisit and return true
+         * This method returns a boolean if the user passes ".." right after the hostName.
+         * It indicates that the user is trying to access the parent directory which is access violation.
          * @param pathToDir
-         * @return
          */
-        public boolean checkIfFileExist(String pathToDir){
-            //this is called after the secureAccess() method
-            //we already know if it is a get/post request
-            //if the request if post :
-                // either create the file or override and return true
-            //else:
-                //just check (Find out what happens if file exist but there is nothing maybe!!!)
-            //return true/false
+        private static boolean secureAccess(String pathFromClient) {
 
+            String[] splitPathToDir = pathFromClient.split("/");
+            if ((splitPathToDir.length > 0) && (splitPathToDir[1].equals(".."))) {
+                statusCode = "403 FORBIDDEN";
+                return false;
+            }
             return true;
-
         }
-
-        /**
-         * this can be called by get() and post()
-         * @param pathToDir
-         */
-        public void openFileAndPerformOperation(String pathToDir){
-            //buffered reader/writer can be defined here only, need not be static variables
-
-            //this is called after the checkIfFileExist()
-            //we already know if it is a get/post request
-            //based on the type of request open Buffered Reader/Writer and perform realted operations.
-            //if post:
-                // open file and write to it
-            //else:
-                //open file and read contents
-            //close the Buffered Reader/Writer.
-        }
+  
     }
-
 }
-
