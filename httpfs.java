@@ -27,7 +27,7 @@ public class httpfs {
      */
     public static void main(String[] args) throws IOException {
 
-        if (args.length >= 6 || args.length == 0) {
+        if (args.length >= 6) {
             System.err.println("\nEnter \"httpfs help\" to get more information.\n");
             System.exit(1);
         } else {
@@ -101,7 +101,7 @@ public class httpfs {
         private static String bodyForClient = "";
         private static String completeMessage = "";
         private static String timeStamp = "";
-        private static boolean overWrite = false;
+        private static boolean overWrite = true;
 
         /**
          * This is the constrcutor that initialises all the variables for every requests receieved.
@@ -156,10 +156,10 @@ public class httpfs {
                 log.append(bodyForClient.getBytes("UTF-8").length);
                 // System.out.println(log);
                 if (httpfs.isVerbose){
-                    httpfs.LOGGER.info(log.toString());
+                    httpfs.LOGGER.info(log.toString()+"\n");
                 }
                 BufferedWriter br = new BufferedWriter(new PrintWriter(new FileWriter("./cwd/log.txt", true)));
-                br.write("["+timeStamp+"] "+log.toString());
+                br.write("["+timeStamp+"] "+log.toString()+"\n");
                 br.flush();
                 br.close();
                 socket.close();
@@ -316,6 +316,10 @@ public class httpfs {
             File parentFile = null;
             BufferedWriter br = null;
 
+            if (!secureAccess(pathFromClient)) {
+                return;
+            }
+
             pathToDir = (currentDirectory + pathToDir);
             Path dir = Paths.get(pathToDir);
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
@@ -334,9 +338,9 @@ public class httpfs {
                 File file = dir.toFile();
                 try {
                     if (overWrite){
-                        br = new BufferedWriter(new PrintWriter(new FileWriter(file, true)));
-                    }else{
                         br = new BufferedWriter(new PrintWriter(new FileWriter(file, false)));
+                    }else{
+                        br = new BufferedWriter(new PrintWriter(new FileWriter(file, true)));
                     }
                     statusCode = "200 OK";
                     br.write(dataFromClient);
