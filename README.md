@@ -1,2 +1,2 @@
-# COMP445-Lab2
+# HTTP server implementation
 Implement basic functionalities of HTTP server.
